@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Smart City Clermont</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="header-titre">
+                <h1>Smart City Clermont-Ferrand</h1>
+                <p>Suivi en temps reel de la metropole</p>
+            </div>
+            <div class="bandeau-meteo" id="bandeau-meteo">
+                <div class="meteo-loading">Chargement meteo...</div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="onglets">
+        <button class="onglet actif" onclick="changerOnglet('velos')">Vélos</button>
+        <button class="onglet" onclick="changerOnglet('transports')">Transports</button>
+        <button class="onglet" onclick="changerOnglet('meteo')">Météo detaillée</button>
+        <button class="onglet" onclick="changerOnglet('favoris')">Mes Favoris</button>
+    </div>
+    
+    <main>
+        <div id="contenu-velos" class="contenu-onglet">
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Stations</h3>
+                    <p id="total-stations">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Velos dispo</h3>
+                    <p id="total-velos">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Places libres</h3>
+                    <p id="total-places">0</p>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <h2>Stations C.Velo</h2>
+                <div id="tableau-velos">Chargement...</div>
+            </div>
+        </div>
+        
+        <div id="contenu-transports" class="contenu-onglet" style="display:none">
+            <div class="filtres">
+                <label>Filtrer par ligne:</label>
+                <select id="filtre-ligne" onchange="filtrerTransports()">
+                    <option value="all">Toutes</option>
+                    <option value="A">Tram A</option>
+                    <option value="B">Tram B</option>
+                    <option value="C">Tram C</option>
+                    <option value="3">Bus 3</option>
+                    <option value="4">Bus 4</option>
+                    <option value="5">Bus 5</option>
+                    <option value="7">Bus 7</option>
+                    <option value="8">Bus 8</option>
+                </select>
+            </div>
+            <div class="table-container">
+                <h2>Arrets et passages</h2>
+                <div id="tableau-transports">Chargement...</div>
+            </div>
+        </div>
+        
+        <div id="contenu-meteo" class="contenu-onglet" style="display:none">
+            <h2>Meteo detaillee par ville</h2>
+            <div id="meteo-detail">Chargement...</div>
+        </div>
+
+        <div id="contenu-favoris" class="contenu-onglet" style="display:none">
+            <h2>Mes stations favorites</h2>
+            <div class="table-container">
+                <div id="tableau-favoris">Chargement...</div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Derniere mise a jour: <span id="timestamp">--</span></p>
+        </footer>
+    </main>
+
+    <!-- Popup de connexion -->
+    <div id="popup-connexion" class="popup" style="display: none;">
+        <div class="popup-contenu">
+            <span class="fermer" onclick="fermerPopup()">&times;</span>
+            <h2>Connexion / Inscription</h2>
+            
+            <div class="onglets-popup">
+                <button class="onglet-popup actif" onclick="changerOngletPopup('connexion')">Connexion</button>
+                <button class="onglet-popup" onclick="changerOngletPopup('inscription')">Inscription</button>
+            </div>
+            
+            <div id="form-connexion">
+                <input type="email" id="login-email" placeholder="Email" class="input-popup">
+                <input type="password" id="login-password" placeholder="Mot de passe" class="input-popup">
+                <button onclick="seConnecter()" class="bouton-popup">Se connecter</button>
+            </div>
+            
+            <div id="form-inscription" style="display: none;">
+                <input type="text" id="register-nom" placeholder="Nom" class="input-popup">
+                <input type="email" id="register-email" placeholder="Email" class="input-popup">
+                <input type="password" id="register-password" placeholder="Mot de passe" class="input-popup">
+                <button onclick="sInscrire()" class="bouton-popup">S'inscrire</button>
+            </div>
+            
+            <div id="message-popup" class="message-popup"></div>
+        </div>
+    </div>
+
+    <!-- Bouton pour ouvrir la popup -->
+    <button id="bouton-connexion" class="bouton-connexion" onclick="ouvrirPopup()">Connexion</button>
+    <div id="info-utilisateur" class="info-utilisateur" style="display: none;"></div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

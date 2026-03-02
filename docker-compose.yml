@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    platform: linux/arm64/v8
+    container_name: smartcity-postgres
+    environment:
+      POSTGRES_DB: smartcity
+      POSTGRES_USER: smartcity_user
+      POSTGRES_PASSWORD: smartcity123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartcity-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartcity_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10
+    container_name: smartcity-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data/jetstream
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nats", "server", "ping", "-s", "nats://localhost:4222"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./smartcity-api
+      dockerfile: Dockerfile
+    container_name: smartcity-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smartcity
+      SPRING_DATASOURCE_USERNAME: smartcity_user
+      SPRING_DATASOURCE_PASSWORD: smartcity123
+      NATS_URL: nats://nats:4222
+    ports:
+      - "8080:8080"
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  worker-cvelo:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-cvelo
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+    command: ["./cvelo_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  worker-t2c:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-t2c
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+    command: ["./t2c_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  worker-meteo:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-meteo
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+    command: ["./meteo_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  nats_data:
+
+networks:
+  smartcity-network:
+    driver: bridge
