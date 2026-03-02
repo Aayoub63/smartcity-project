@@ -78,6 +78,7 @@ Si les streams JetStream venaient à être supprimés, vous pouvez les recréer 
 ```bash
 cd scripts
 ./init-jetstream.sh
+```
 
 ## Fonctionnalités
 
