@@ -1,0 +1,176 @@
+services:
+  # 1. BASE DE DONNÉES POSTGRESQL
+  postgres:
+    image: postgres:16
+    platform: linux/arm64/v8
+    container_name: smartcity-postgres
+    environment:
+      POSTGRES_DB: smartcity
+      POSTGRES_USER: smartcity_user
+      POSTGRES_PASSWORD: smartcity123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartcity-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartcity_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 2. NATS JETSTREAM (MESSAGE BROKER)
+  nats:
+    image: nats:2.10
+    container_name: smartcity-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data/jetstream
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nats", "server", "ping", "-s", "nats://localhost:4222"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. API SPRING BOOT
+  api:
+    build:
+      context: ./smartcity-api
+      dockerfile: Dockerfile
+    container_name: smartcity-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smartcity
+      SPRING_DATASOURCE_USERNAME: smartcity_user
+      SPRING_DATASOURCE_PASSWORD: smartcity123
+      NATS_URL: nats://nats:4222
+    ports:
+      - "8080:8080"
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  # 4. WORKER C.VELO (VÉLOS)
+  worker-cvelo:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-cvelo
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+    command: ["./cvelo_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  # 5. WORKER T2C (TRANSPORTS)
+  worker-t2c:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-t2c
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+    command: ["./t2c_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  # 6. WORKER MÉTÉO
+  worker-meteo:
+    build:
+      context: ./smartcity-workers
+      dockerfile: Dockerfile
+    container_name: smartcity-worker-meteo
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: nats://nats:4222
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+    command: ["./meteo_worker"]
+    networks:
+      - smartcity-network
+    restart: unless-stopped
+
+  # 7  n8n POUR L'AUTOMATISATION
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: smartcity-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=smartcity123
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=smartcity_user
+      - DB_POSTGRESDB_PASSWORD=smartcity123
+      - DB_POSTGRESDB_CONNECTION_TIMEOUT=30000
+      - DB_POSTGRESDB_POOL_MAX=2
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PAYLOAD_SIZE_MAX=16
+      - N8N_METRICS=false
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - smartcity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  # 8. UTILITAIRE : Création de la base n8n (optionnel)
+  n8n-db-setup:
+    image: postgres:16
+    container_name: smartcity-n8n-db-setup
+    command: >
+      bash -c "
+        echo ' Création de la base n8n...' &&
+        PGPASSWORD=smartcity123 psql -h postgres -U smartcity_user -d postgres -c 'CREATE DATABASE n8n;' 2>/dev/null &&
+        echo ' Base n8n créée ' ||
+        echo ' Base n8n existe déjà'
+      "
+    environment:
+      PGPASSWORD: smartcity123
+    networks:
+      - smartcity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+# VOLUMES PERSISTANTS
+volumes:
+  postgres_data:
+  nats_data:
+  n8n_data:   
+
+# RÉSEAU
+networks:
+  smartcity-network:
+    driver: bridge
